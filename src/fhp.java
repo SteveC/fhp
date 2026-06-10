@@ -12,6 +12,18 @@ public class fhp
   private static final byte BOTTOM_LEFT  = 16;
   private static final byte BOTTOM_RIGHT = 32;
 
+  private static final byte DIRECTIONS[] = {
+    RIGHT,
+    TOP_RIGHT,
+    TOP_LEFT,
+    LEFT,
+    BOTTOM_LEFT,
+    BOTTOM_RIGHT
+  };
+
+  private static final int MOMENTUM_X[] = { 2, 1, -1, -2, -1, 1 };
+  private static final int MOMENTUM_Y[] = { 0, -1, -1, 0, 1, 1 };
+
 
   private int nWidth = 2048;
   private int nHeight = 1024;
@@ -24,6 +36,8 @@ public class fhp
 
   private byte gasTable[][];
   private byte moveTable[][];
+
+  private int nRandomState = (int)System.nanoTime();
 
   public static void main(String[] args)
   {
@@ -54,6 +68,7 @@ public class fhp
   private void init()
   {
     generateLookupTable();
+    verifyLookupTable();
     createTables();
     initBouncePoints();
   } // init
@@ -164,14 +179,12 @@ public class fhp
     // force some momentum on an imaginary plate on the left
     // 
 
-    Random r = new Random();
-
     for( int y = 1; y < nHeight; y++)
     {
       
       if( (gasTable[0][y] & RIGHT ) != 0 && (gasTable[0][y] & LEFT) ==0)
       {
-        if(r.nextDouble() < chance)
+        if(nextRandomDouble() < chance)
         {
           gasTable[0][y] = (byte)( (gasTable[0][y] & TOP_RIGHT) + 
               (gasTable[0][y] & TOP_LEFT) + 
@@ -188,7 +201,7 @@ public class fhp
         switch(gasTable[0][y])
         {
           case(BOTTOM_RIGHT + RIGHT + TOP_RIGHT + TOP_LEFT + LEFT):
-            if( r.nextDouble() < chance )
+            if( nextRandomDouble() < chance )
             {
               gasTable[0][y] = RIGHT + TOP_RIGHT + TOP_LEFT + LEFT + BOTTOM_LEFT;
 
@@ -196,16 +209,16 @@ public class fhp
             break;
 
           case(RIGHT + TOP_RIGHT + LEFT + BOTTOM_LEFT + BOTTOM_RIGHT):
-            if( r.nextDouble() < chance)
+            if( nextRandomDouble() < chance)
             {
               gasTable[0][y] = RIGHT + TOP_LEFT + LEFT + BOTTOM_LEFT + BOTTOM_RIGHT;
             }
             break;
 
           case(RIGHT + LEFT + TOP_RIGHT + TOP_LEFT):
-            if( r.nextDouble() < chance)
+            if( nextRandomDouble() < chance)
             {
-              if( r.nextBoolean() )
+              if( nextRandomBoolean() )
               {
                 gasTable[0][y] = RIGHT + LEFT + TOP_RIGHT + BOTTOM_LEFT;
 
@@ -228,11 +241,9 @@ public class fhp
 
   public void iterate()
   {
-    byte tempTable[][] = new byte[nWidth][nHeight];
+    byte tempTable[][] = moveTable;
 
-    Random r = new Random();
-
-    int nR = r.nextInt();
+    int nR = nextRandomInt();
 
     int counter = 32;
 
@@ -246,7 +257,7 @@ public class fhp
         if(counter == 0)
         {
 
-          nR = r.nextInt();
+          nR = nextRandomInt();
           counter = 31;
         }
 
@@ -446,126 +457,198 @@ public class fhp
   private void generateLookupTable()
   {
 
-    for( byte i = 0; i < 64; i++ )
+    for( int i = 0; i < 64; i++ )
     {
-      switch(i)
+      setPhysicalCollision(i, i, i);
+
+      int matches[] = new int[3];
+      int nMatches = 0;
+
+      for( int j = 0; j < 64; j++ )
       {
-        // 2-particle collision
-
-        case(LEFT + RIGHT):
-          lookupTable[0][i] = TOP_LEFT + BOTTOM_RIGHT;
-          lookupTable[1][i] = TOP_RIGHT + BOTTOM_LEFT;
-          break;
-
-        case(TOP_RIGHT + BOTTOM_LEFT):
-          lookupTable[0][i] = LEFT + RIGHT;
-          lookupTable[1][i] = TOP_LEFT + BOTTOM_RIGHT;
-          break;
-
-        case(TOP_LEFT + BOTTOM_RIGHT):
-          lookupTable[0][i] = LEFT + RIGHT;
-          lookupTable[1][i] = TOP_RIGHT + BOTTOM_LEFT;
-          break;
-
-          // 3-particle collision
-
-        case(RIGHT + TOP_RIGHT + BOTTOM_LEFT):
-          lookupTable[0][i] = RIGHT + TOP_LEFT + BOTTOM_RIGHT;
-          lookupTable[1][i] = RIGHT + TOP_LEFT + BOTTOM_RIGHT;
-
-        case(RIGHT + TOP_LEFT + BOTTOM_RIGHT):
-          lookupTable[0][i] = RIGHT + TOP_RIGHT + BOTTOM_LEFT;
-          lookupTable[1][i] = RIGHT + TOP_RIGHT + BOTTOM_LEFT;
-
-
-        case(TOP_RIGHT + TOP_LEFT + BOTTOM_RIGHT):
-          lookupTable[0][i] = TOP_RIGHT + LEFT + RIGHT;
-          lookupTable[1][i] = TOP_RIGHT + LEFT + RIGHT;
-
-        case(TOP_RIGHT + LEFT + RIGHT):
-          lookupTable[0][i] = TOP_RIGHT + TOP_LEFT + BOTTOM_RIGHT;
-          lookupTable[0][i] = TOP_RIGHT + TOP_LEFT + BOTTOM_RIGHT;
-
-
-        case(TOP_LEFT + TOP_RIGHT + BOTTOM_LEFT):
-          lookupTable[0][i] = TOP_LEFT + LEFT + RIGHT;
-          lookupTable[1][i] = TOP_LEFT + LEFT + RIGHT;
-
-        case(TOP_LEFT + LEFT + RIGHT):
-          lookupTable[0][i] = TOP_LEFT + TOP_RIGHT + BOTTOM_LEFT;
-          lookupTable[1][i] = TOP_LEFT + TOP_RIGHT + BOTTOM_LEFT;
-
-
-        case(LEFT + TOP_LEFT + BOTTOM_RIGHT):
-          lookupTable[0][i] = LEFT + TOP_RIGHT + BOTTOM_LEFT;
-          lookupTable[1][i] = LEFT + TOP_RIGHT + BOTTOM_LEFT;
-
-        case(LEFT + TOP_RIGHT + BOTTOM_LEFT):
-          lookupTable[0][i] = LEFT + TOP_LEFT + BOTTOM_RIGHT;
-          lookupTable[1][i] = LEFT + TOP_LEFT + BOTTOM_RIGHT;
-
-
-        case(BOTTOM_LEFT + LEFT + RIGHT):
-          lookupTable[0][i] = BOTTOM_LEFT + BOTTOM_RIGHT + TOP_LEFT;
-          lookupTable[1][i] = BOTTOM_LEFT + BOTTOM_RIGHT + TOP_LEFT;
-
-        case(BOTTOM_LEFT + BOTTOM_RIGHT + TOP_LEFT):
-          lookupTable[0][i] = BOTTOM_LEFT + LEFT + RIGHT;
-          lookupTable[1][i] = BOTTOM_LEFT + LEFT + RIGHT;
-
-
-        case(BOTTOM_RIGHT + BOTTOM_LEFT + TOP_RIGHT):
-          lookupTable[0][i] = BOTTOM_RIGHT + LEFT + RIGHT;
-          lookupTable[1][i] = BOTTOM_RIGHT + LEFT + RIGHT;
-
-        case(BOTTOM_RIGHT + LEFT + RIGHT):
-          lookupTable[0][i] = BOTTOM_RIGHT + BOTTOM_LEFT + TOP_RIGHT;
-          lookupTable[1][i] = BOTTOM_RIGHT + BOTTOM_LEFT + TOP_RIGHT;
-
-
-
-        case(RIGHT + TOP_LEFT + BOTTOM_LEFT):
-          lookupTable[0][i] = RIGHT + TOP_LEFT + BOTTOM_LEFT;
-          lookupTable[1][i] = LEFT + TOP_RIGHT + BOTTOM_RIGHT;
-
-        case(LEFT + TOP_RIGHT + BOTTOM_RIGHT):
-          lookupTable[0][i] = RIGHT + TOP_LEFT + BOTTOM_LEFT;
-          lookupTable[1][i] = LEFT + TOP_RIGHT + BOTTOM_LEFT;
-
-
-          // 4-particle collision
-
-        case(TOP_RIGHT + TOP_LEFT + BOTTOM_RIGHT + BOTTOM_LEFT):
-          lookupTable[0][i] = LEFT + RIGHT + TOP_RIGHT + BOTTOM_LEFT;
-          lookupTable[1][i] = LEFT + RIGHT + TOP_LEFT + BOTTOM_RIGHT;
-
-        case(LEFT + RIGHT + TOP_RIGHT + BOTTOM_LEFT):
-          lookupTable[0][i] = LEFT + RIGHT + TOP_LEFT + BOTTOM_RIGHT;
-          lookupTable[1][i] = TOP_RIGHT + TOP_LEFT + BOTTOM_RIGHT + BOTTOM_LEFT;
-
-        case(LEFT + RIGHT + TOP_LEFT + BOTTOM_RIGHT):
-          lookupTable[0][i] = LEFT + RIGHT + TOP_RIGHT + BOTTOM_LEFT;
-          lookupTable[1][i] = TOP_RIGHT + TOP_LEFT + BOTTOM_RIGHT + BOTTOM_LEFT;
-
-          // everything else just continues, no scatter
-
-        default:
-
-          lookupTable[0][i] =  (byte)(
-              ((i & RIGHT) << 3)
-              + ((i & TOP_RIGHT) << 3)
-              + ((i & TOP_LEFT) << 3)
-              + ((i & LEFT) >> 3)
-              + ((i & BOTTOM_LEFT) >> 3)
-              + ((i & BOTTOM_RIGHT) >> 3));
-
-          lookupTable[1][i] = lookupTable[0][i];
-
+        if( i != j &&
+            countParticles(i) == countParticles(j) &&
+            momentumX(i) == momentumX(j) &&
+            momentumY(i) == momentumY(j) )
+        {
+          matches[nMatches] = j;
+          nMatches++;
+        }
       }
 
+      if( countParticles(i) == 3 && nMatches == 1 )
+      {
+        // Three-particle states have one alternate state with the same momentum.
+        setPhysicalCollision(i, matches[0], matches[0]);
+      }
+      else if( (countParticles(i) == 2 || countParticles(i) == 4) && nMatches == 2 )
+      {
+        // Head-on particles, or the equivalent two-hole four-particle collision.
+        setPhysicalCollision(i, matches[0], matches[1]);
+      }
     }
 
   } // generateLookupTable
+
+
+
+  private void setPhysicalCollision(int input, int output0, int output1)
+  {
+    lookupTable[0][input] = reverseDirections(output0);
+    lookupTable[1][input] = reverseDirections(output1);
+
+  } // setPhysicalCollision
+
+
+
+  private byte reverseDirections(int state)
+  {
+    byte reversed = 0;
+
+    if( (state & RIGHT) != 0 )
+    {
+      reversed += LEFT;
+    }
+
+    if( (state & TOP_RIGHT) != 0 )
+    {
+      reversed += BOTTOM_LEFT;
+    }
+
+    if( (state & TOP_LEFT) != 0 )
+    {
+      reversed += BOTTOM_RIGHT;
+    }
+
+    if( (state & LEFT) != 0 )
+    {
+      reversed += RIGHT;
+    }
+
+    if( (state & BOTTOM_LEFT) != 0 )
+    {
+      reversed += TOP_RIGHT;
+    }
+
+    if( (state & BOTTOM_RIGHT) != 0 )
+    {
+      reversed += TOP_LEFT;
+    }
+
+    return reversed;
+
+  } // reverseDirections
+
+
+
+  private int countParticles(int state)
+  {
+    int count = 0;
+
+    for( int i = 0; i < DIRECTIONS.length; i++ )
+    {
+      if( (state & DIRECTIONS[i]) != 0 )
+      {
+        count++;
+      }
+    }
+
+    return count;
+
+  } // countParticles
+
+
+
+  private int momentumX(int state)
+  {
+    int total = 0;
+
+    for( int i = 0; i < DIRECTIONS.length; i++ )
+    {
+      if( (state & DIRECTIONS[i]) != 0 )
+      {
+        total += MOMENTUM_X[i];
+      }
+    }
+
+    return total;
+
+  } // momentumX
+
+
+
+  private int momentumY(int state)
+  {
+    int total = 0;
+
+    for( int i = 0; i < DIRECTIONS.length; i++ )
+    {
+      if( (state & DIRECTIONS[i]) != 0 )
+      {
+        total += MOMENTUM_Y[i];
+      }
+    }
+
+    return total;
+
+  } // momentumY
+
+
+
+  private void verifyLookupTable()
+  {
+    for( int state = 0; state < 64; state++ )
+    {
+      for( int randomChoice = 0; randomChoice < 2; randomChoice++ )
+      {
+        int output = reverseDirections(lookupTable[randomChoice][state]);
+
+        if( countParticles(state) != countParticles(output) ||
+            momentumX(state) != momentumX(output) ||
+            momentumY(state) != momentumY(output) )
+        {
+          throw new IllegalStateException(
+              "Bad lookup table entry: state " + state +
+              ", choice " + randomChoice +
+              ", output " + output);
+        }
+      }
+    }
+
+  } // verifyLookupTable
+
+
+
+  private int nextRandomInt()
+  {
+    nRandomState ^= (nRandomState << 13);
+    nRandomState ^= (nRandomState >>> 17);
+    nRandomState ^= (nRandomState << 5);
+
+    if( nRandomState == 0 )
+    {
+      nRandomState = 0x1f123bb5;
+    }
+
+    return nRandomState;
+
+  } // nextRandomInt
+
+
+
+  private boolean nextRandomBoolean()
+  {
+    return (nextRandomInt() & 1) != 0;
+
+  } // nextRandomBoolean
+
+
+
+  private double nextRandomDouble()
+  {
+    return (double)(nextRandomInt() & 0x7fffffff) / (double)0x7fffffff;
+
+  } // nextRandomDouble
 
 
 
