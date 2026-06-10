@@ -64,3 +64,24 @@ The repaired-code render is:
 artifacts/fhp-gas-flow-fixed.mp4
 artifacts/fhp-gas-flow-fixed.gif
 ```
+
+## Render Velocity Curl
+
+The simulator also writes coarse velocity fields as `test-vel-###` files. To render curl/vorticity-colored flow from a completed run in `runs/fixed-full`:
+
+```sh
+python3 tools/render_velocity_curl.py
+
+ffmpeg -y -framerate 12 -i artifacts/curl-flow-frames/curl-flow-%03d.ppm \
+  -vf "format=yuv420p" artifacts/fhp-curl-flow-fixed.mp4
+
+ffmpeg -y -framerate 12 -i artifacts/curl-flow-frames/curl-flow-%03d.ppm \
+  -vf "fps=12,scale=768:-1:flags=neighbor" artifacts/fhp-curl-flow-fixed.gif
+```
+
+The curl render is:
+
+```text
+artifacts/fhp-curl-flow-fixed.mp4
+artifacts/fhp-curl-flow-fixed.gif
+```
