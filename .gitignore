@@ -1,0 +1,5 @@
+.DS_Store
+build/
+runs/
+/test-gas-*.ppm
+/test-vel-*
