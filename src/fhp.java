@@ -494,6 +494,8 @@ public class fhp
 
   private void setPhysicalCollision(int input, int output0, int output1)
   {
+    // Stored bits name the direction a particle arrived from. The physical
+    // outgoing directions therefore have to be reversed before propagation.
     lookupTable[0][input] = reverseDirections(output0);
     lookupTable[1][input] = reverseDirections(output1);
 

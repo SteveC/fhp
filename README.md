@@ -48,6 +48,8 @@ The archived source had a hand-written 64-entry collision table with missing `br
 
 The current source generates the table from particle-count and momentum equivalence classes, then verifies every entry at startup. Each table output must conserve particle count and momentum after converting from the stored reverse-direction encoding used by the movement step.
 
+This is closest to the six-velocity FHP collision family: random two-particle head-on scattering, symmetric three-particle collisions, and four-particle two-hole collisions. The horizontal boundary is still the archived program's periodic wraparound plus a left-column momentum bias, not a true open inlet/outlet.
+
 ## Render Existing Frames
 
 ```sh
@@ -84,4 +86,13 @@ The curl render is:
 ```text
 artifacts/fhp-curl-flow-fixed.mp4
 artifacts/fhp-curl-flow-fixed.gif
+```
+
+For a more visual combined density/curl/velocity render:
+
+```sh
+python3 tools/render_flow_gif.py
+
+ffmpeg -y -framerate 12 -i artifacts/flow-art-frames/flow-art-%03d.ppm \
+  -vf "fps=12,scale=768:-1:flags=lanczos" artifacts/fhp-flow-awesome.gif
 ```

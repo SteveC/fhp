@@ -11,6 +11,9 @@ OUT_W = 1024
 OUT_H = 512
 VEL_W = 15
 VEL_H = 7
+LATTICE_W = 2048
+LATTICE_H = 1024
+VEL_CELL = 128
 
 
 def read_ppm(path):
@@ -34,6 +37,27 @@ def upsample(field, width=OUT_W, height=OUT_H):
     src_h, src_w = field.shape
     x = np.linspace(0, src_w - 1, width)
     y = np.linspace(0, src_h - 1, height)
+    x0 = np.floor(x).astype(np.int32)
+    y0 = np.floor(y).astype(np.int32)
+    x1 = np.minimum(x0 + 1, src_w - 1)
+    y1 = np.minimum(y0 + 1, src_h - 1)
+    wx = x - x0
+    wy = y - y0
+
+    top = field[y0[:, None], x0[None, :]] * (1.0 - wx)[None, :] + field[y0[:, None], x1[None, :]] * wx[None, :]
+    bottom = field[y1[:, None], x0[None, :]] * (1.0 - wx)[None, :] + field[y1[:, None], x1[None, :]] * wx[None, :]
+    return top * (1.0 - wy)[:, None] + bottom * wy[:, None]
+
+
+def upsample_velocity_field(field, width=OUT_W, height=OUT_H):
+    src_h, src_w = field.shape
+    src_x = (np.arange(src_w) * VEL_CELL + VEL_CELL * 0.5) / LATTICE_W * width
+    src_y = (np.arange(src_h) * VEL_CELL + VEL_CELL * 0.5) / LATTICE_H * height
+    dst_x = np.arange(width)
+    dst_y = np.arange(height)
+
+    x = np.interp(dst_x, src_x, np.arange(src_w))
+    y = np.interp(dst_y, src_y, np.arange(src_h))
     x0 = np.floor(x).astype(np.int32)
     y0 = np.floor(y).astype(np.int32)
     x1 = np.minimum(x0 + 1, src_w - 1)
@@ -116,7 +140,12 @@ def main():
     if not gas_files or len(gas_files) != len(vel_files):
         raise SystemExit("expected matching gas and velocity frames in runs/fixed-full")
 
-    velocities = [read_velocity(path) for path in vel_files]
+    velocities = []
+    for path in vel_files:
+        vx, vy = read_velocity(path)
+        # Stored gas bits represent where particles arrived from, so the saved
+        # velocity vectors are opposite the physical direction of travel.
+        velocities.append((-vx, -vy))
     speed_fields = [np.hypot(vx, vy) for vx, vy in velocities]
     curl_fields = [np.gradient(vy, axis=1) - np.gradient(vx, axis=0) for vx, vy in velocities]
     speed_scale = max(1.0, np.percentile(np.concatenate([s.ravel() for s in speed_fields]), 96))
@@ -128,10 +157,10 @@ def main():
 
     for i, (gas_file, (vx, vy), speed, curl) in enumerate(zip(gas_files, velocities, speed_fields, curl_fields)):
         density = smooth(upsample(read_ppm(gas_file)), 1)
-        vx_u = smooth(upsample(vx), 3)
-        vy_u = smooth(upsample(vy), 3)
-        speed_u = smooth(upsample(speed), 3)
-        curl_u = smooth(upsample(curl), 3)
+        vx_u = smooth(upsample_velocity_field(vx), 3)
+        vy_u = smooth(upsample_velocity_field(vy), 3)
+        speed_u = smooth(upsample_velocity_field(speed), 3)
+        curl_u = smooth(upsample_velocity_field(curl), 3)
 
         density_n = np.clip((density - 0.12) / 0.88, 0.0, 1.0)
         speed_n = np.clip(speed_u / speed_scale, 0.0, 1.0)
@@ -139,26 +168,26 @@ def main():
 
         angle = np.arctan2(vy_u, vx_u)
         direction_hue = (angle + np.pi) / (2.0 * np.pi)
-        speed_rgb = hsv_to_rgb(direction_hue, 0.42 + 0.32 * speed_n, 0.38 + 0.46 * speed_n)
+        speed_rgb = hsv_to_rgb(direction_hue, 0.58 + 0.38 * speed_n, 0.44 + 0.52 * speed_n)
 
         base = np.zeros((OUT_H, OUT_W, 3), dtype=np.float64)
-        base[..., 0] = 16 + 82 * density_n
-        base[..., 1] = 20 + 96 * density_n
-        base[..., 2] = 28 + 122 * density_n
+        base[..., 0] = 10 + 78 * density_n
+        base[..., 1] = 12 + 88 * density_n
+        base[..., 2] = 18 + 110 * density_n
 
         curl_red = np.maximum(curl_n, 0.0)
         curl_blue = np.maximum(-curl_n, 0.0)
         curl_rgb = np.stack([
-            238 * curl_red + 28 * curl_blue,
-            46 + 48 * (1.0 - np.abs(curl_n)),
-            245 * curl_blue + 42 * curl_red,
+            255 * curl_red + 10 * curl_blue,
+            24 + 32 * (1.0 - np.abs(curl_n)),
+            255 * curl_blue + 12 * curl_red,
         ], axis=-1)
 
         lighting = gradient_lighting(density_n)
         combined = (
-            base * (0.58 + 0.20 * density_n[..., None]) +
-            speed_rgb * 255.0 * (0.13 + 0.20 * speed_n[..., None]) +
-            curl_rgb * (0.26 + 0.22 * np.abs(curl_n)[..., None])
+            base * (0.48 + 0.22 * density_n[..., None]) +
+            speed_rgb * 255.0 * (0.16 + 0.26 * speed_n[..., None]) +
+            curl_rgb * (0.36 + 0.32 * np.abs(curl_n)[..., None])
         )
         combined *= (0.92 + 0.20 * lighting[..., None])
 
