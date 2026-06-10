@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
+import argparse
 from pathlib import Path
 
 import numpy as np
 
 
 ROOT = Path(__file__).resolve().parents[1]
-RUN_DIR = ROOT / "runs" / "fixed-full"
 FRAME_DIR = ROOT / "artifacts" / "flow-art-frames"
 OUT_W = 1024
 OUT_H = 512
@@ -135,8 +135,17 @@ def write_ppm(path, img):
 
 
 def main():
-    gas_files = sorted(RUN_DIR.glob("test-gas-*.ppm"))
-    vel_files = sorted(RUN_DIR.glob("test-vel-*"))
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--run-dir",
+        default=str(ROOT / "runs" / "fixed-full"),
+        help="Directory containing test-gas-###.ppm and test-vel-### files.",
+    )
+    args = parser.parse_args()
+
+    run_dir = Path(args.run_dir)
+    gas_files = sorted(run_dir.glob("test-gas-*.ppm"))
+    vel_files = sorted(run_dir.glob("test-vel-*"))
     if not gas_files or len(gas_files) != len(vel_files):
         raise SystemExit("expected matching gas and velocity frames in runs/fixed-full")
 
